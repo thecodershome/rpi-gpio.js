@@ -229,6 +229,57 @@ function Gpio() {
     };
 
     /**
+     * Setup array of channels
+     *
+     * Example error { channel: 99, error: Error }
+     * Example result { channel: 7, result: {*} } // result from setup
+     *
+     * @see {@link Gpio.setup}
+     * @param {number[]} channels
+     * @param direction
+     * @param edge
+     * @param {function} onSetup   Optional callback with (err[], res[])
+     */
+    this.setupAll = function (channels, direction, edge, onSetup /*err[], res[]*/) {
+        if (!Array.isArray(channels))
+            return process.nextTick(function () {
+                onSetup(new Error('Channel must be an array'));
+            });
+
+        if (arguments.length === 2 && typeof direction === 'function') {
+            onSetup = direction;
+            direction = null;
+            edge = null;
+        } else if (arguments.length === 3 && typeof edge === 'function') {
+            onSetup = edge;
+            edge = null;
+        } else {
+            onSetup = onSetup || function () {
+                }
+        }
+
+        let errors = [];
+        let results = [];
+
+        async.each(channels,
+            function (chan, next) {
+                function done(err, res) { // setup callback
+                    if (err) { // push error
+                        errors.push({channel: chan, error: err});
+                    } else { // push result
+                        results.push({channel: chan, result: res});
+                    }
+                    next()
+                }
+
+                GPIO.setup(chan, direction, edge, done);
+            },
+            function () { // finished
+                onSetup(errors, results);
+            });
+    };
+
+    /**
      * Write a value to a channel
      *
      * @param {number}   channel The channel to write to
